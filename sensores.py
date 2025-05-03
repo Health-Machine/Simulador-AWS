@@ -4,17 +4,27 @@ import pandas as pd
 import datetime as dt
 import time
 import database
+import io
+import boto3
+
 
 inicio = 1000
 fim = 6000
 passo = 100
 
-ID_SENSOR_CORRENTE = database.get_sensor('ACS712 30A')
-ID_SENSOR_TENSAO = database.get_sensor('ZMPT101B')
-ID_SENSOR_TEMPERATURA = database.get_sensor('LM35CZ')
-ID_SENSOR_VIBRACAO = database.get_sensor('QM30VT1')
-ID_SENSOR_PRESSAO = database.get_sensor('MPX5700DP')
-ID_SENSOR_FREQUENCIA = database.get_sensor('IFM DI6001')
+# ID_SENSOR_CORRENTE = database.get_sensor('ACS712 30A')
+# ID_SENSOR_TENSAO = database.get_sensor('ZMPT101B')
+# ID_SENSOR_TEMPERATURA = database.get_sensor('LM35CZ')
+# ID_SENSOR_VIBRACAO = database.get_sensor('QM30VT1')
+# ID_SENSOR_PRESSAO = database.get_sensor('MPX5700DP')
+# ID_SENSOR_FREQUENCIA = database.get_sensor('IFM DI6001')
+
+ID_SENSOR_CORRENTE = 1
+ID_SENSOR_TENSAO = 2
+ID_SENSOR_TEMPERATURA = 3
+ID_SENSOR_VIBRACAO = 4
+ID_SENSOR_PRESSAO = 5
+ID_SENSOR_FREQUENCIA = 6
 
 # Configuração do banco de dados
 engine = database.get_engine()
@@ -57,23 +67,38 @@ def simular_dados(sensor_id, calcular_valor):
     start_time = time.time()
     start_memory = measure_memory()
 
+    current_time = dt.datetime.now()
+
     for repeticoes in range(inicio, fim + 1, passo):
         for _ in range(repeticoes):
             valor_calculado = calcular_valor()
             insert = {
                 'fk_sensor': sensor_id,
                 'valor': valor_calculado,
-                'data_captura': dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                'data_captura': current_time.strftime('%Y-%m-%d %H:%M:%S')
             }
             valores.append(insert)
+            current_time += dt.timedelta(seconds=1)
 
     end_time = time.time()
     end_memory = measure_memory()
 
     df = pd.DataFrame(valores)
     # df.to_sql('captura', con=engine, if_exists='append', index=False)
-    df.to_csv('captura.csv', mode='a', header=False, index=False)
+    #df.to_csv('captura.csv', mode='a', header=False, index=False)
 
+    # Salvar em um buffer de memória
+    csv_buffer = io.StringIO()
+    df.to_csv(csv_buffer, index=False)
+
+    # # Enviar para o S3
+    s3 = boto3.client('s3')
+    bucket_name = 'raw-bucket-health-machine'
+    arquivo_s3 = f'dados/sensor_{sensor_id}.csv'
+
+    s3.put_object(Bucket=bucket_name, Key=arquivo_s3, Body=csv_buffer.getvalue())
+
+    print(f"Arquivo enviado ao S3: s3://{bucket_name}/{arquivo_s3}")
     print("""
     Tempo de execução: {:.2f} segundos
     Memória usada: {:.2f} MB
