@@ -54,7 +54,7 @@ variacao_maxima_freq = 1.5
 
 # Parâmetros do sensor de pressão
 pressao_nominal = 35.0  # Pa
-variacao_maxima_pressao = 0.5  # Pa
+variacao_maxima_pressao = 2.5  # Pa
 
 
 
@@ -67,42 +67,45 @@ def simular_dados(sensor_id, calcular_valor):
     start_time = time.time()
     start_memory = measure_memory()
 
-    current_time = dt.datetime.now()
+    agora = dt.datetime.now()
+    seis_meses_atras = agora - dt.timedelta(days=30*6)  # Aproximadamente 6 meses
 
-    for repeticoes in range(inicio, fim + 1, passo):
-        for _ in range(repeticoes):
-            valor_calculado = calcular_valor()
-            insert = {
-                'fk_sensor': sensor_id,
-                'valor': valor_calculado,
-                'data_captura': current_time.strftime('%Y-%m-%d %H:%M:%S')
-            }
-            valores.append(insert)
-            current_time += dt.timedelta(seconds=1)
+    current_time = seis_meses_atras
+
+    # Simular dados a cada minuto durante 6 meses (aproximadamente 262,800 registros)
+    while current_time <= agora:
+        valor_calculado = calcular_valor()
+        insert = {
+            'fk_sensor': sensor_id,
+            'valor': valor_calculado,
+            'data_captura': current_time.strftime('%Y-%m-%d %H:%M:%S')
+        }
+        valores.append(insert)
+        current_time += dt.timedelta(minutes=1)  # 1 dado por minuto
 
     end_time = time.time()
     end_memory = measure_memory()
 
     df = pd.DataFrame(valores)
-    # df.to_sql('captura', con=engine, if_exists='append', index=False)
-    #df.to_csv('captura.csv', mode='a', header=False, index=False)
 
-    # Salvar em um buffer de memória
+    # Salvar CSV em buffer
     csv_buffer = io.StringIO()
     df.to_csv(csv_buffer, index=False)
 
-    # # Enviar para o S3
-    s3 = boto3.client('s3')
+    # Enviar para "S3" local (simulado)
     bucket_name = 'raw-bucket-health-machine'
-    arquivo_s3 = f'dados/sensor_{sensor_id}.csv'
+    arquivo_s3 = f'sensor_{sensor_id}.csv'
 
-    s3.put_object(Bucket=bucket_name, Key=arquivo_s3, Body=csv_buffer.getvalue())
+    with open(arquivo_s3, 'w', newline='', encoding='utf-8') as f:
+        f.write(csv_buffer.getvalue())
+
 
     print(f"Arquivo enviado ao S3: s3://{bucket_name}/{arquivo_s3}")
     print("""
     Tempo de execução: {:.2f} segundos
     Memória usada: {:.2f} MB
     """.format(end_time - start_time, end_memory - start_memory))
+
 
 
 def calcular_corrente():
