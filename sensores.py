@@ -6,7 +6,7 @@ import time
 import database
 import io
 import boto3
-
+import requests
 
 inicio = 1000
 fim = 6000
