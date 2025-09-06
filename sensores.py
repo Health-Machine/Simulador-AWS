@@ -97,20 +97,20 @@ def simular_dados(sensor_id, calcular_valor):
     print(f"Status Code: {response.status_code}, Response: {response.text}")
 
     # Salvar CSV em buffer
-    csv_buffer = io.StringIO()
-    df.to_csv(csv_buffer, index=False)
+    # csv_buffer = io.StringIO()
+    # df.to_csv(csv_buffer, index=False)
 
-    print(df.head())
+    
 
     # Enviar para "S3" local (simulado)
-    bucket_name = 'raw-bucket-health-machine'
-    arquivo_s3 = f'sensor_{sensor_id}.csv'
+    # bucket_name = 'raw-bucket-health-machine'
+    # arquivo_s3 = f'sensor_{sensor_id}.csv'
 
-    with open(arquivo_s3, 'w', newline='', encoding='utf-8') as f:
-        f.write(csv_buffer.getvalue())
+    # with open(arquivo_s3, 'w', newline='', encoding='utf-8') as f:
+    #     f.write(csv_buffer.getvalue())
 
 
-    print(f"Arquivo enviado ao S3: s3://{bucket_name}/{arquivo_s3}")
+    # print(f"Arquivo enviado ao S3: s3://{bucket_name}/{arquivo_s3}")
     print("""
     Tempo de execução: {:.2f} segundos
     Memória usada: {:.2f} MB
