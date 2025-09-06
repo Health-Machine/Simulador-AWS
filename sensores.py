@@ -12,6 +12,8 @@ inicio = 1000
 fim = 6000
 passo = 100
 
+url = "https://httpbin.org/post"
+
 # ID_SENSOR_CORRENTE = database.get_sensor('ACS712 30A')
 # ID_SENSOR_TENSAO = database.get_sensor('ZMPT101B')
 # ID_SENSOR_TEMPERATURA = database.get_sensor('LM35CZ')
@@ -27,7 +29,7 @@ ID_SENSOR_PRESSAO = 5
 ID_SENSOR_FREQUENCIA = 6
 
 # Configuração do banco de dados
-engine = database.get_engine()
+# engine = database.get_engine()
 
 # Corrente
 tensao_padrao = 2.5      
@@ -88,9 +90,17 @@ def simular_dados(sensor_id, calcular_valor):
 
     df = pd.DataFrame(valores)
 
+    #Converte o dataframe para array de Jsons
+    dados = df.to_dict(orient='records')
+    # Envia os dados para a API Gateway
+    response = requests.post(url, json=dados)
+    print(f"Status Code: {response.status_code}, Response: {response.text}")
+
     # Salvar CSV em buffer
     csv_buffer = io.StringIO()
     df.to_csv(csv_buffer, index=False)
+
+    print(df.head())
 
     # Enviar para "S3" local (simulado)
     bucket_name = 'raw-bucket-health-machine'
