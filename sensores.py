@@ -97,11 +97,10 @@ def simular_dados(sensor_id, calcular_valor):
 
     df = pd.DataFrame(valores)
 
-    # Preparar arquivo JSON com o padrão de nome solicitado:
-    # Ex: 20250909211500-frequencia.json (YYYYMMDDhhmmss-nome_sensor.json)
     ts = dt.datetime.now().strftime('%Y%m%d%H%M%S')
     nome_sensor = _sensor_name(sensor_id)
     filename = f"{ts}-{nome_sensor}.json"
+    
     # Construir a URL de PUT pegando a base da url original e substituindo o arquivo final
     base_url = url.rsplit('/', 1)[0]
     put_url = f"{base_url}/{filename}"
