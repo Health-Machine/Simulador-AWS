@@ -12,7 +12,7 @@ inicio = 1000
 fim = 6000
 passo = 100
 
-url = "https://httpbin.org/post"
+url = "https://bzz8yo29s7.execute-api.us-east-1.amazonaws.com/hml/raw-bucket-199917718936/teste.json"
 
 # ID_SENSOR_CORRENTE = database.get_sensor('ACS712 30A')
 # ID_SENSOR_TENSAO = database.get_sensor('ZMPT101B')
@@ -32,8 +32,8 @@ ID_SENSOR_FREQUENCIA = 6
 # engine = database.get_engine()
 
 # Corrente
-tensao_padrao = 2.5      
-sensibilidade = 0.066        
+tensao_padrao = 2.5
+sensibilidade = 0.066
 corrente_nominal = 10.0
 tensao_teorica = tensao_padrao + corrente_nominal * sensibilidade
 
@@ -58,11 +58,19 @@ variacao_maxima_freq = 1.5
 pressao_nominal = 35.0  # Pa
 variacao_maxima_pressao = 2.5  # Pa
 
-
-
 def measure_memory():
     return sys.getsizeof([]) / (1024 * 1024)
 
+def _sensor_name(sensor_id):
+    mapping = {
+        1: 'corrente',
+        2: 'tensao',
+        3: 'temperatura',
+        4: 'vibracao',
+        5: 'pressao',
+        6: 'frequencia'
+    }
+    return mapping.get(sensor_id, 'sensor')
 
 def simular_dados(sensor_id, calcular_valor):
     valores = []
@@ -70,10 +78,9 @@ def simular_dados(sensor_id, calcular_valor):
     start_memory = measure_memory()
 
     agora = dt.datetime.now()
-    seis_meses_atras = agora - dt.timedelta(days=30*6)  # Aproximadamente 6 meses
+    seis_meses_atras = agora - dt.timedelta(days=30)  # Aproximadamente 6 meses
 
     current_time = seis_meses_atras
-
     # Simular dados a cada minuto durante 6 meses (aproximadamente 262,800 registros)
     while current_time <= agora:
         valor_calculado = calcular_valor()
@@ -90,17 +97,27 @@ def simular_dados(sensor_id, calcular_valor):
 
     df = pd.DataFrame(valores)
 
-    #Converte o dataframe para array de Jsons
-    dados = df.to_dict(orient='records')
-    # Envia os dados para a API Gateway
-    response = requests.post(url, json=dados)
+    # Preparar arquivo JSON com o padrão de nome solicitado:
+    # Ex: 20250909211500-frequencia.json (YYYYMMDDhhmmss-nome_sensor.json)
+    ts = dt.datetime.now().strftime('%Y%m%d%H%M%S')
+    nome_sensor = _sensor_name(sensor_id)
+    filename = f"{ts}-{nome_sensor}.json"
+    # Construir a URL de PUT pegando a base da url original e substituindo o arquivo final
+    base_url = url.rsplit('/', 1)[0]
+    put_url = f"{base_url}/{filename}"
+
+    # Gerar JSON como bytes (orient='records' = array de objetos)
+    json_bytes = df.to_json(orient='records').encode('utf-8')
+
+    # Fazer PUT com conteúdo binário (equivalente a --data-binary @file e header Content-Type)
+    headers = {'Content-Type': 'application/json'}
+    response = requests.put(put_url, data=json_bytes, headers=headers)
+    print(f"PUT URL: {put_url}")
     print(f"Status Code: {response.status_code}, Response: {response.text}")
 
     # Salvar CSV em buffer
     # csv_buffer = io.StringIO()
     # df.to_csv(csv_buffer, index=False)
-
-    
 
     # Enviar para "S3" local (simulado)
     # bucket_name = 'raw-bucket-health-machine'
@@ -109,65 +126,51 @@ def simular_dados(sensor_id, calcular_valor):
     # with open(arquivo_s3, 'w', newline='', encoding='utf-8') as f:
     #     f.write(csv_buffer.getvalue())
 
-
     # print(f"Arquivo enviado ao S3: s3://{bucket_name}/{arquivo_s3}")
     print("""
     Tempo de execução: {:.2f} segundos
     Memória usada: {:.2f} MB
     """.format(end_time - start_time, end_memory - start_memory))
 
-
-
 def calcular_corrente():
     variacao = random.uniform(-0.01, 0.02)
     tensao_saida = tensao_teorica + variacao
     return round((tensao_saida - tensao_padrao) / sensibilidade, 3)
 
-
 def calcular_tensao():
     variacao = random.uniform(variacao_minima, vmax_in)
     return (variacao / vmax_in) * vmax_out
-
 
 def calcular_temperatura():
     variacao = random.uniform(-variacao_maxima_temp, variacao_maxima_temp)
     return round(temperatura_nominal + variacao, 2)
 
-
 def calcular_vibracao():
     variacao = random.uniform(-variacao_permitida, variacao_permitida)
     return round(velocidade_nominal + variacao, 3)
-
 
 def calcular_pressao():
     variacao = random.uniform(-variacao_maxima_pressao, variacao_maxima_pressao)
     return round(pressao_nominal + variacao, 2)
 
-
 def calcular_frequencia():
     variacao = random.uniform(-variacao_maxima_freq, variacao_maxima_freq)
     return round(frequencia_nominal + variacao, 2)
 
-
 def sim_corrente():
     simular_dados(ID_SENSOR_CORRENTE, calcular_corrente)
-
 
 def sim_tensao():
     simular_dados(ID_SENSOR_TENSAO, calcular_tensao)
 
-
 def sim_temperatura():
     simular_dados(ID_SENSOR_TEMPERATURA, calcular_temperatura)
-
 
 def sim_vibracao():
     simular_dados(ID_SENSOR_VIBRACAO, calcular_vibracao)
 
-
 def sim_pressao():
     simular_dados(ID_SENSOR_PRESSAO, calcular_pressao)
-
 
 def sim_frequencia():
     simular_dados(ID_SENSOR_FREQUENCIA, calcular_frequencia)
