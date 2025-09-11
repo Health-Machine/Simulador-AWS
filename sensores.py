@@ -12,7 +12,7 @@ inicio = 1000
 fim = 6000
 passo = 100
 
-url = "https://bzz8yo29s7.execute-api.us-east-1.amazonaws.com/hml/raw-bucket-199917718936/teste.json"
+url = "https://8khqlqlvkg.execute-api.us-east-1.amazonaws.com/hml/raw-bucket-199917718936/teste.json"
 
 # ID_SENSOR_CORRENTE = database.get_sensor('ACS712 30A')
 # ID_SENSOR_TENSAO = database.get_sensor('ZMPT101B')
@@ -100,10 +100,10 @@ def simular_dados(sensor_id, calcular_valor):
     ts = dt.datetime.now().strftime('%Y%m%d%H%M%S')
     nome_sensor = _sensor_name(sensor_id)
     filename = f"{ts}-{nome_sensor}.json"
-    
+
     # Construir a URL de PUT pegando a base da url original e substituindo o arquivo final
     base_url = url.rsplit('/', 1)[0]
-    put_url = f"{base_url}/{filename}"
+    put_url = f"{base_url}/sensor/{filename}"
 
     # Gerar JSON como bytes (orient='records' = array de objetos)
     json_bytes = df.to_json(orient='records').encode('utf-8')
