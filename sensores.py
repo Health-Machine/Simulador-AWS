@@ -12,7 +12,7 @@ corrente_nominal = 10.0
 tensao_teorica = tensao_padrao + corrente_nominal * sensibilidade
 
 # Tensão
-vmax_out = 3.53
+vmax_out = 3.53 
 vmax_in = 400
 variacao_minima = 220
 
@@ -67,7 +67,7 @@ def calcular_corrente():
 
 def calcular_tensao():
     variacao = random.uniform(variacao_minima, vmax_in)
-    return (variacao / vmax_in) * vmax_out
+    return ((variacao / vmax_in) * vmax_out) * 100
 
 def calcular_temperatura():
     variacao = random.uniform(-variacao_maxima_temp, variacao_maxima_temp)
@@ -87,4 +87,4 @@ def calcular_frequencia():
 
 
 # Exemplo de uso:
-simular_dados(url, meses=1, intervalo_minutos=360000)
+simular_dados(url, meses=1, intervalo_minutos=3600)
