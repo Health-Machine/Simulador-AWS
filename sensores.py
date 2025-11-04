@@ -1,35 +1,9 @@
-import sys
+import json
 import random
-import pandas as pd
 import datetime as dt
-import time
-import database
-import io
-import boto3
-import requests
+import requests  # única adição
 
-inicio = 1000
-fim = 6000
-passo = 100
-
-url = "https://8khqlqlvkg.execute-api.us-east-1.amazonaws.com/hml/raw-bucket-199917718936/teste.json"
-
-# ID_SENSOR_CORRENTE = database.get_sensor('ACS712 30A')
-# ID_SENSOR_TENSAO = database.get_sensor('ZMPT101B')
-# ID_SENSOR_TEMPERATURA = database.get_sensor('LM35CZ')
-# ID_SENSOR_VIBRACAO = database.get_sensor('QM30VT1')
-# ID_SENSOR_PRESSAO = database.get_sensor('MPX5700DP')
-# ID_SENSOR_FREQUENCIA = database.get_sensor('IFM DI6001')
-
-ID_SENSOR_CORRENTE = 1
-ID_SENSOR_TENSAO = 2
-ID_SENSOR_TEMPERATURA = 3
-ID_SENSOR_VIBRACAO = 4
-ID_SENSOR_PRESSAO = 5
-ID_SENSOR_FREQUENCIA = 6
-
-# Configuração do banco de dados
-# engine = database.get_engine()
+url = "https://suotc0e1d7.execute-api.us-east-1.amazonaws.com/hml/raw-bucket-891377383993/captura_de_dados.json"
 
 # Corrente
 tensao_padrao = 2.5
@@ -42,97 +16,52 @@ vmax_out = 3.53
 vmax_in = 400
 variacao_minima = 220
 
-# Parâmetros do sensor de temperatura
-temperatura_nominal = 25.0  # graus Celsius
-variacao_maxima_temp = 0.8  # variação máxima simulada
+# Temperatura
+temperatura_nominal = 25.0
+variacao_maxima_temp = 0.8
 
-# Parâmetros do sensor QM30VT1
-velocidade_nominal = 10.0  # Velocidade de vibração nominal em mm/s
-variacao_permitida = 2.0  # Variação aleatória permitida
+# Vibração
+velocidade_nominal = 6.0
+variacao_permitida = 5.0
 
-# Parâmetros do sensor de frequência
+# Frequência
 frequencia_nominal = 60.0
 variacao_maxima_freq = 1.5
 
-# Parâmetros do sensor de pressão
-pressao_nominal = 35.0  # Pa
-variacao_maxima_pressao = 2.5  # Pa
+# Pressão
+pressao_nominal = 35.0
+variacao_maxima_pressao = 2.5
 
-def measure_memory():
-    return sys.getsizeof([]) / (1024 * 1024)
 
-def _sensor_name(sensor_id):
-    mapping = {
-        1: 'corrente',
-        2: 'tensao',
-        3: 'temperatura',
-        4: 'vibracao',
-        5: 'pressao',
-        6: 'frequencia'
-    }
-    return mapping.get(sensor_id, 'sensor')
-
-def simular_dados(sensor_id, calcular_valor):
-    valores = []
-    start_time = time.time()
-    start_memory = measure_memory()
-
+def simular_dados(url, meses, intervalo_minutos):
     agora = dt.datetime.now()
-    seis_meses_atras = agora - dt.timedelta(days=30)  # Aproximadamente 6 meses
+    current_time = agora - dt.timedelta(days=30 * meses)
+    dados = []
 
-    current_time = seis_meses_atras
-    # Simular dados a cada minuto durante 6 meses (aproximadamente 262,800 registros)
     while current_time <= agora:
-        valor_calculado = calcular_valor()
-        insert = {
-            'fk_sensor': sensor_id,
-            'valor': valor_calculado,
-            'data_captura': current_time.strftime('%Y-%m-%d %H:%M:%S')
+        record = {
+            'data_captura': current_time.strftime('%Y-%m-%d %H:%M:%S'),
+            'sensor_1': calcular_corrente(),
+            'sensor_2': calcular_tensao(),
+            'sensor_3': calcular_temperatura(),
+            'sensor_4': calcular_vibracao(),
+            'sensor_5': calcular_pressao(),
+            'sensor_6': calcular_frequencia()
         }
-        valores.append(insert)
-        current_time += dt.timedelta(minutes=1)  # 1 dado por minuto
+        dados.append(record)
+        current_time += dt.timedelta(minutes=intervalo_minutos)
 
-    end_time = time.time()
-    end_memory = measure_memory()
+    # envia o JSON direto via HTTP PUT
+    r = requests.put(url, data=json.dumps(dados), headers={'Content-Type': 'application/json'})
 
-    df = pd.DataFrame(valores)
+    print(f"Status: {r.status_code}")
+    print(f"Resposta: {r.text}")
+    # print(json.dumps(dados, indent=2))
+    print(f"Enviado para: {url} ({len(dados)} registros)")
 
-    ts = dt.datetime.now().strftime('%Y%m%d%H%M%S')
-    nome_sensor = _sensor_name(sensor_id)
-    filename = f"{ts}-{nome_sensor}.json"
-
-    # Construir a URL de PUT pegando a base da url original e substituindo o arquivo final
-    base_url = url.rsplit('/', 1)[0]
-    put_url = f"{base_url}/sensor/{filename}"
-
-    # Gerar JSON como bytes (orient='records' = array de objetos)
-    json_bytes = df.to_json(orient='records').encode('utf-8')
-
-    # Fazer PUT com conteúdo binário (equivalente a --data-binary @file e header Content-Type)
-    headers = {'Content-Type': 'application/json'}
-    response = requests.put(put_url, data=json_bytes, headers=headers)
-    print(f"PUT URL: {put_url}")
-    print(f"Status Code: {response.status_code}, Response: {response.text}")
-
-    # Salvar CSV em buffer
-    # csv_buffer = io.StringIO()
-    # df.to_csv(csv_buffer, index=False)
-
-    # Enviar para "S3" local (simulado)
-    # bucket_name = 'raw-bucket-health-machine'
-    # arquivo_s3 = f'sensor_{sensor_id}.csv'
-
-    # with open(arquivo_s3, 'w', newline='', encoding='utf-8') as f:
-    #     f.write(csv_buffer.getvalue())
-
-    # print(f"Arquivo enviado ao S3: s3://{bucket_name}/{arquivo_s3}")
-    print("""
-    Tempo de execução: {:.2f} segundos
-    Memória usada: {:.2f} MB
-    """.format(end_time - start_time, end_memory - start_memory))
 
 def calcular_corrente():
-    variacao = random.uniform(-0.01, 0.02)
+    variacao = random.uniform(-0.5, 0.5)
     tensao_saida = tensao_teorica + variacao
     return round((tensao_saida - tensao_padrao) / sensibilidade, 3)
 
@@ -156,20 +85,6 @@ def calcular_frequencia():
     variacao = random.uniform(-variacao_maxima_freq, variacao_maxima_freq)
     return round(frequencia_nominal + variacao, 2)
 
-def sim_corrente():
-    simular_dados(ID_SENSOR_CORRENTE, calcular_corrente)
 
-def sim_tensao():
-    simular_dados(ID_SENSOR_TENSAO, calcular_tensao)
-
-def sim_temperatura():
-    simular_dados(ID_SENSOR_TEMPERATURA, calcular_temperatura)
-
-def sim_vibracao():
-    simular_dados(ID_SENSOR_VIBRACAO, calcular_vibracao)
-
-def sim_pressao():
-    simular_dados(ID_SENSOR_PRESSAO, calcular_pressao)
-
-def sim_frequencia():
-    simular_dados(ID_SENSOR_FREQUENCIA, calcular_frequencia)
+# Exemplo de uso:
+simular_dados(url, meses=1, intervalo_minutos=360000)
