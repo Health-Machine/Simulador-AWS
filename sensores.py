@@ -16,7 +16,7 @@ vmax_in = 400
 variacao_minima = 300
 tensao_normal_base = 350  # O centro da faixa normal
 variacao_normal = 2.0
-probabilidade_pico = 0.05 # 5% de chance de pico
+probabilidade_pico = 0.01 # 5% de chance de pico
 
 # Temperatura
 temperatura_nominal = 25.0
