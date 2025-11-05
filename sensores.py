@@ -13,7 +13,7 @@ tensao_teorica = tensao_padrao + corrente_nominal * sensibilidade
 
 # Tensão
 vmax_in = 400
-variacao_minima = 0
+variacao_minima = 300
 tensao_normal_base = 350  # O centro da faixa normal
 variacao_normal = 2.0
 probabilidade_pico = 0.05 # 5% de chance de pico
