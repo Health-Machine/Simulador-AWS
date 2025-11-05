@@ -4,7 +4,7 @@ import datetime as dt
 import requests
 
 # Endpoint de destino
-url = "https://suotc0e1d7.execute-api.us-east-1.amazonaws.com/hml/raw-bucket-891377383993/sensor/captura_de_dados.json"
+url = "https://g5xyw5okt6.execute-api.us-east-1.amazonaws.com/hml/raw-bucket-891377383993/sensor/captura_de_dados.json"
 
 # Corrente
 tensao_padrao = 2.5
