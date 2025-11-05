@@ -12,9 +12,11 @@ corrente_nominal = 10.0
 tensao_teorica = tensao_padrao + corrente_nominal * sensibilidade
 
 # Tensão
-vmax_out = 3.53 
 vmax_in = 400
-variacao_minima = 220
+variacao_minima = 0
+tensao_normal_base = 350  # O centro da faixa normal
+variacao_normal = 2.0
+probabilidade_pico = 0.05 # 5% de chance de pico
 
 # Temperatura
 temperatura_nominal = 25.0
@@ -68,8 +70,19 @@ def calcular_corrente():
     return round((tensao_saida - tensao_padrao) / sensibilidade, 3)
 
 def calcular_tensao():
-    variacao = random.uniform(variacao_minima, vmax_in)
-    return ((variacao / vmax_in) * vmax_out) * 100
+    limite_normal_inferior = tensao_normal_base - variacao_normal
+    limite_normal_superior = tensao_normal_base + variacao_normal
+
+    if random.random() < probabilidade_pico:
+        if random.choice([True, False]):
+            variacao = random.uniform(limite_normal_superior, vmax_in)
+        else:
+            variacao = random.uniform(variacao_minima, limite_normal_inferior)
+    
+    else:
+        variacao = random.uniform(limite_normal_inferior, limite_normal_superior)
+
+    return round(variacao, 2)
 
 def calcular_temperatura():
     variacao = random.uniform(-variacao_maxima_temp, variacao_maxima_temp)
