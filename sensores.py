@@ -13,8 +13,8 @@ tensao_teorica = tensao_padrao + corrente_nominal * sensibilidade
 
 # Tensão
 vmax_out = 3.53 
-vmax_in = 400
-variacao_minima = 220
+vmax_in = 350
+variacao_minima = 300
 
 # Temperatura
 temperatura_nominal = 25.0
