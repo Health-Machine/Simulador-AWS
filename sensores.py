@@ -39,6 +39,7 @@ def simular_dados(url, meses, intervalo_minutos):
     dados = []
 
     while current_time <= agora:
+
         record = {
             'data_captura': current_time.strftime('%Y-%m-%d %H:%M:%S'),
             'sensor_1': calcular_corrente(),
@@ -48,6 +49,7 @@ def simular_dados(url, meses, intervalo_minutos):
             'sensor_5': calcular_pressao(),
             'sensor_6': calcular_frequencia()
         }
+
         dados.append(record)
         current_time += dt.timedelta(minutes=intervalo_minutos)
 
@@ -87,4 +89,4 @@ def calcular_frequencia():
 
 
 # Exemplo de uso:
-simular_dados(url, meses=1, intervalo_minutos=3600)
+simular_dados(url, meses=1, intervalo_minutos=1)
