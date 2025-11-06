@@ -94,16 +94,16 @@ def calcular_corrente():
 
     if comportamento_normal:
         # Corrente normal entre 10 e 50 A (faixa de trabalho)
-        corrente = random.uniform(10, 50)
+        corrente = random.uniform(10,20)
     else:
         # 10% de chance — escolhe um estado anômalo
         estado_anomalo = random.choice(["Desligada", "Ociosa", "Sobrecarga"])
         if estado_anomalo == "Desligada":
             corrente = random.uniform(0.0, 0.3)
-        elif estado_anomalo == "Ociosa":
-            corrente = random.uniform(0.4, 9.9)
+        elif estado_anomalo == "Ociosa":    
+            corrente = random.uniform(0.4, 8)
         else:  # Sobrecarga
-            corrente = random.uniform(51, 80)
+            corrente = random.uniform(20, 80)
 
     # Converte para tensão simulando o sensor (saída do ACS712, por exemplo)
     tensao_saida = tensao_padrao + corrente * sensibilidade + random.uniform(-0.05, 0.05)
