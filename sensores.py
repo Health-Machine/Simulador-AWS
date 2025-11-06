@@ -65,9 +65,37 @@ def simular_dados(url, meses, intervalo_minutos):
 
 
 def calcular_corrente():
-    variacao = random.uniform(-0.5, 0.5)
-    tensao_saida = tensao_teorica + variacao
-    return round((tensao_saida - tensao_padrao) / sensibilidade, 3)
+    """
+    Simula o comportamento da corrente em quatro estados operacionais:
+    - Desligada (< 0.5 A)
+    - Ociosa (0.5 A - 9.9 A)
+    - Em Carga (10 A - 50 A)
+    - Sobrecarga (> 50 A)
+
+    Comportamento esperado:
+    - 90% das leituras são normais (Em Carga)
+    - 10% das leituras simulam anomalias (Desligada, Ociosa ou Sobrecarga)
+    """
+    comportamento_normal = random.random() > 0.10  # 90% normal
+
+    if comportamento_normal:
+        # Corrente normal entre 10 e 50 A (faixa de trabalho)
+        corrente = random.uniform(10, 50)
+    else:
+        # 10% de chance — escolhe um estado anômalo
+        estado_anomalo = random.choice(["Desligada", "Ociosa", "Sobrecarga"])
+        if estado_anomalo == "Desligada":
+            corrente = random.uniform(0.0, 0.3)
+        elif estado_anomalo == "Ociosa":
+            corrente = random.uniform(0.4, 9.9)
+        else:  # Sobrecarga
+            corrente = random.uniform(51, 80)
+
+    # Converte para tensão simulando o sensor (saída do ACS712, por exemplo)
+    tensao_saida = tensao_padrao + corrente * sensibilidade + random.uniform(-0.05, 0.05)
+    corrente_real = (tensao_saida - tensao_padrao) / sensibilidade
+    return round(corrente_real, 3)
+
 
 def calcular_tensao():
     limite_normal_inferior = tensao_normal_base - variacao_normal
