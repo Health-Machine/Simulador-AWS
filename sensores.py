@@ -114,7 +114,7 @@ def calcular_pressao():
     return round(pressao_nominal + variacao, 2)
 
 
-def calcular_frequencia():
+def calcular_frequencia(current_time, inicio_simulacao):
     """
     A frequência oscila naturalmente, mas a cada dia muda de comportamento:
     - Dia 1: normal (58–62)
