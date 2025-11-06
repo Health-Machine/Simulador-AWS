@@ -35,9 +35,12 @@ freq_normal_min = 55.0
 freq_normal_max = 65.0
 frequencia_minima = 38.0
 frequencia_maxima = 72.0
-osc_normal_amp = 5.0        # amplitude da oscilação em modo normal (~±5 -> 55-65)
-osc_phase_amp = 1.5         # amplitude durante as fases de degradação/elevação (mais sutil)
-recovery_hours = 6   
+osc_normal_amp = 5.0
+osc_phase_amp = 1.5
+recovery_hours = 6
+ultima_freq = frequencia_nominal
+inicio_zona_critica = None
+tipo_zona = None  # 'alta' ou 'baixa'  
 
 # Pressão
 pressao_nominal = 35.0
@@ -119,60 +122,72 @@ def calcular_pressao():
 
 
 def calcular_frequencia(current_time, inicio_simulacao):
-    # dias inteiros passados desde o início da simulação
+    global ultima_freq, inicio_zona_critica, tipo_zona
+
     total_days = (current_time - inicio_simulacao).days
-    phase = total_days % 4  # 0..3
-    # fração do dia atual (0..1)
+    phase = total_days % 4
     seconds_into_day = (current_time - current_time.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds()
     frac_day = seconds_into_day / 86400.0
 
+    # --- cálculo original de baseline ---
     if phase == 0:
-        # modo normal: baseline nominal com oscilação natural maior
         baseline = frequencia_nominal
         osc = random.uniform(-osc_normal_amp, osc_normal_amp)
         valor = baseline + osc
 
     elif phase == 1:
-        # queda gradual ao longo do dia: baseline linear de 60 -> 38
         baseline = frequencia_nominal + (frequencia_minima - frequencia_nominal) * frac_day
-        # oscilações sutis enquanto cai
         osc = random.uniform(-osc_phase_amp, osc_phase_amp)
-        valor = baseline + osc
-        # garantir que não suba acima do início da fase
-        # (isso evita "pulos" bruscos)
-        max_allowed = frequencia_nominal - 0.1  # pequeno buffer
-        if valor > max_allowed:
-            valor = max_allowed
+        valor = min(baseline + osc, frequencia_nominal - 0.1)
 
     elif phase == 2:
-        # recuperação rápida: primeiros recovery_hours do dia -> sobe linearmente de 38 -> 60
         hour_of_day = seconds_into_day / 3600.0
         if hour_of_day <= recovery_hours:
-            progresso = hour_of_day / recovery_hours  # 0..1 ao longo da recuperação rápida
+            progresso = hour_of_day / recovery_hours
             baseline = frequencia_minima + (frequencia_nominal - frequencia_minima) * progresso
             osc = random.uniform(-osc_phase_amp, osc_phase_amp)
             valor = baseline + osc
         else:
-            # depois da recuperação, fica normal (osc normal)
             baseline = frequencia_nominal
             osc = random.uniform(-osc_normal_amp, osc_normal_amp)
             valor = baseline + osc
 
     else:  # phase == 3
-        # subida gradual ao longo do dia: baseline linear de 60 -> 72
         baseline = frequencia_nominal + (frequencia_maxima - frequencia_nominal) * frac_day
-        # oscilações sutis enquanto sobe
         osc = random.uniform(-osc_phase_amp, osc_phase_amp)
-        valor = baseline + osc
-        # garantir que não caia abaixo do início da fase
-        min_allowed = frequencia_nominal + 0.1
-        if valor < min_allowed:
-            valor = min_allowed
+        valor = max(baseline + osc, frequencia_nominal + 0.1)
 
-    # segurança: limitar para não sair de limites plausíveis
-    valor = max( round(valor, 2), 28.0 )   # piso de segurança
-    valor = min( valor, 78.0 )             # teto de segurança
+    # --- segurança de limites absolutos ---
+    valor = max(min(round(valor, 2), 78.0), 28.0)
 
+    # --- controle de tempo em zona crítica ---
+    zona_critica = None
+    if valor > 70:
+        zona_critica = 'alta'
+    elif valor < 40:
+        zona_critica = 'baixa'
+
+    if zona_critica:
+        if tipo_zona != zona_critica:
+            # entrou em nova zona
+            tipo_zona = zona_critica
+            inicio_zona_critica = current_time
+        else:
+            # já estava nessa zona
+            tempo_na_zona = current_time - inicio_zona_critica
+            if tempo_na_zona > timedelta(minutes=30):
+                # força retorno gradual à faixa segura
+                if zona_critica == 'alta':
+                    valor = random.uniform(68, 70)
+                else:
+                    valor = random.uniform(40, 42)
+                tipo_zona = None
+                inicio_zona_critica = None
+    else:
+        tipo_zona = None
+        inicio_zona_critica = None
+
+    ultima_freq = valor
     return valor
 
 
