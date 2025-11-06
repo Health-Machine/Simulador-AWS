@@ -32,6 +32,8 @@ horario_parada_fim = 16     # fim da parada (16h)
 # Frequência
 frequencia_nominal = 60.0
 variacao_maxima_freq = 1.5
+frequencia_minima = 38.0
+frequencia_maxima = 72.0
 
 # Pressão
 pressao_nominal = 35.0
@@ -51,7 +53,7 @@ def simular_dados(meses, intervalo_minutos):
             'sensor_3': calcular_temperatura(),
             'sensor_4': calcular_vibracao(current_time),
             'sensor_5': calcular_pressao(),
-            'sensor_6': calcular_frequencia()
+            'sensor_6': calcular_frequencia(current_time, agora)
         }
 
         dados.append(record)
@@ -113,8 +115,37 @@ def calcular_pressao():
 
 
 def calcular_frequencia():
-    variacao = random.uniform(-variacao_maxima_freq, variacao_maxima_freq)
-    return round(frequencia_nominal + variacao, 2)
+    """
+    A frequência oscila naturalmente, mas a cada dia muda de comportamento:
+    - Dia 1: normal (58–62)
+    - Dia 2: começa a cair até 38
+    - Dia 3: recupera até normal
+    - Dia 4: sobe até 72
+    - Dia 5: normaliza novamente
+    """
+    
+    dias_passados = (current_time - inicio_simulacao).days % 4
+
+    if dias_passados == 1:
+        # Fase de queda
+        progresso = (current_time.hour + current_time.minute / 60) / 24
+        valor = frequencia_nominal - (frequencia_nominal - frequencia_minima) * progresso
+    elif dias_passados == 2:
+        # Fase de recuperação
+        progresso = (current_time.hour + current_time.minute / 60) / 24
+        valor = frequencia_minima + (frequencia_nominal - frequencia_minima) * progresso
+    elif dias_passados == 3:
+        # Fase de pico
+        progresso = (current_time.hour + current_time.minute / 60) / 24
+        valor = frequencia_nominal + (frequencia_maxima - frequencia_nominal) * progresso
+    else:
+        # Normal
+        valor = random.uniform(frequencia_nominal - variacao_maxima_freq,
+                               frequencia_nominal + variacao_maxima_freq)
+
+    # Pequena oscilação natural
+    valor += random.uniform(-0.5, 0.5)
+    return round(valor, 2)
 
 
 # Exemplo de uso:
