@@ -31,9 +31,13 @@ horario_parada_fim = 16     # fim da parada (16h)
 
 # Frequência
 frequencia_nominal = 60.0
-variacao_maxima_freq = 1.5
+freq_normal_min = 55.0
+freq_normal_max = 65.0
 frequencia_minima = 38.0
 frequencia_maxima = 72.0
+osc_normal_amp = 5.0        # amplitude da oscilação em modo normal (~±5 -> 55-65)
+osc_phase_amp = 1.5         # amplitude durante as fases de degradação/elevação (mais sutil)
+recovery_hours = 6   
 
 # Pressão
 pressao_nominal = 35.0
@@ -115,37 +119,61 @@ def calcular_pressao():
 
 
 def calcular_frequencia(current_time, inicio_simulacao):
-    """
-    A frequência oscila naturalmente, mas a cada dia muda de comportamento:
-    - Dia 1: normal (58–62)
-    - Dia 2: começa a cair até 38
-    - Dia 3: recupera até normal
-    - Dia 4: sobe até 72
-    - Dia 5: normaliza novamente
-    """
-    
-    dias_passados = (current_time - inicio_simulacao).days % 4
+    # dias inteiros passados desde o início da simulação
+    total_days = (current_time - inicio_simulacao).days
+    phase = total_days % 4  # 0..3
+    # fração do dia atual (0..1)
+    seconds_into_day = (current_time - current_time.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds()
+    frac_day = seconds_into_day / 86400.0
 
-    if dias_passados == 1:
-        # Fase de queda
-        progresso = (current_time.hour + current_time.minute / 60) / 24
-        valor = frequencia_nominal - (frequencia_nominal - frequencia_minima) * progresso
-    elif dias_passados == 2:
-        # Fase de recuperação
-        progresso = (current_time.hour + current_time.minute / 60) / 24
-        valor = frequencia_minima + (frequencia_nominal - frequencia_minima) * progresso
-    elif dias_passados == 3:
-        # Fase de pico
-        progresso = (current_time.hour + current_time.minute / 60) / 24
-        valor = frequencia_nominal + (frequencia_maxima - frequencia_nominal) * progresso
-    else:
-        # Normal
-        valor = random.uniform(frequencia_nominal - variacao_maxima_freq,
-                               frequencia_nominal + variacao_maxima_freq)
+    if phase == 0:
+        # modo normal: baseline nominal com oscilação natural maior
+        baseline = frequencia_nominal
+        osc = random.uniform(-osc_normal_amp, osc_normal_amp)
+        valor = baseline + osc
 
-    # Pequena oscilação natural
-    valor += random.uniform(-0.5, 0.5)
-    return round(valor, 2)
+    elif phase == 1:
+        # queda gradual ao longo do dia: baseline linear de 60 -> 38
+        baseline = frequencia_nominal + (frequencia_minima - frequencia_nominal) * frac_day
+        # oscilações sutis enquanto cai
+        osc = random.uniform(-osc_phase_amp, osc_phase_amp)
+        valor = baseline + osc
+        # garantir que não suba acima do início da fase
+        # (isso evita "pulos" bruscos)
+        max_allowed = frequencia_nominal - 0.1  # pequeno buffer
+        if valor > max_allowed:
+            valor = max_allowed
+
+    elif phase == 2:
+        # recuperação rápida: primeiros recovery_hours do dia -> sobe linearmente de 38 -> 60
+        hour_of_day = seconds_into_day / 3600.0
+        if hour_of_day <= recovery_hours:
+            progresso = hour_of_day / recovery_hours  # 0..1 ao longo da recuperação rápida
+            baseline = frequencia_minima + (frequencia_nominal - frequencia_minima) * progresso
+            osc = random.uniform(-osc_phase_amp, osc_phase_amp)
+            valor = baseline + osc
+        else:
+            # depois da recuperação, fica normal (osc normal)
+            baseline = frequencia_nominal
+            osc = random.uniform(-osc_normal_amp, osc_normal_amp)
+            valor = baseline + osc
+
+    else:  # phase == 3
+        # subida gradual ao longo do dia: baseline linear de 60 -> 72
+        baseline = frequencia_nominal + (frequencia_maxima - frequencia_nominal) * frac_day
+        # oscilações sutis enquanto sobe
+        osc = random.uniform(-osc_phase_amp, osc_phase_amp)
+        valor = baseline + osc
+        # garantir que não caia abaixo do início da fase
+        min_allowed = frequencia_nominal + 0.1
+        if valor < min_allowed:
+            valor = min_allowed
+
+    # segurança: limitar para não sair de limites plausíveis
+    valor = max( round(valor, 2), 28.0 )   # piso de segurança
+    valor = min( valor, 78.0 )             # teto de segurança
+
+    return valor
 
 
 # Exemplo de uso:
