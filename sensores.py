@@ -2,6 +2,7 @@ import json
 import random
 import datetime as dt
 import requests
+from datetime import timedelta
 
 # Endpoint de destino
 url = "https://g5xyw5okt6.execute-api.us-east-1.amazonaws.com/hml/raw-bucket-891377383993/sensor/captura_de_dados.json"
@@ -31,16 +32,14 @@ horario_parada_fim = 16     # fim da parada (16h)
 
 # Frequência
 frequencia_nominal = 60.0
-freq_normal_min = 55.0
-freq_normal_max = 65.0
 frequencia_minima = 38.0
 frequencia_maxima = 72.0
-osc_normal_amp = 5.0
-osc_phase_amp = 1.5
-recovery_hours = 6
+osc_normal_amp = 4.0
+osc_phase_amp = 1.0
+velocidade_variacao = 0.02  # variação linear (~1,2 por hora)
 ultima_freq = frequencia_nominal
-inicio_zona_critica = None
-tipo_zona = None  # 'alta' ou 'baixa'  
+fase = "normal"
+fora_limite_desde = None  # controla tempo fora dos limites
 
 # Pressão
 pressao_nominal = 35.0
@@ -150,74 +149,60 @@ def calcular_pressao():
 
 
 def calcular_frequencia(current_time, inicio_simulacao):
-    global ultima_freq, inicio_zona_critica, tipo_zona
+    global ultima_freq, fase, fora_limite_desde
 
-    total_days = (current_time - inicio_simulacao).days
-    phase = total_days % 4
-    seconds_into_day = (current_time - current_time.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds()
-    frac_day = seconds_into_day / 86400.0
+    # tempo desde o início (em dias)
+    dias_passados = (current_time - inicio_simulacao).days
+    minutos_passados = (current_time - inicio_simulacao).total_seconds() / 60
 
-    # --- cálculo original de baseline ---
-    if phase == 0:
-        baseline = frequencia_nominal
+    # define a fase do ciclo
+    if dias_passados % 4 == 0:
+        fase = "normal"
+        alvo = frequencia_nominal
         osc = random.uniform(-osc_normal_amp, osc_normal_amp)
-        valor = baseline + osc
-
-    elif phase == 1:
-        baseline = frequencia_nominal + (frequencia_minima - frequencia_nominal) * frac_day
+    elif dias_passados % 4 == 1:
+        fase = "descendo"
+        alvo = frequencia_minima
         osc = random.uniform(-osc_phase_amp, osc_phase_amp)
-        valor = min(baseline + osc, frequencia_nominal - 0.1)
-
-    elif phase == 2:
-        hour_of_day = seconds_into_day / 3600.0
-        if hour_of_day <= recovery_hours:
-            progresso = hour_of_day / recovery_hours
-            baseline = frequencia_minima + (frequencia_nominal - frequencia_minima) * progresso
-            osc = random.uniform(-osc_phase_amp, osc_phase_amp)
-            valor = baseline + osc
-        else:
-            baseline = frequencia_nominal
-            osc = random.uniform(-osc_normal_amp, osc_normal_amp)
-            valor = baseline + osc
-
-    else:  # phase == 3
-        baseline = frequencia_nominal + (frequencia_maxima - frequencia_nominal) * frac_day
+    elif dias_passados % 4 == 2:
+        fase = "subindo"
+        alvo = frequencia_nominal
         osc = random.uniform(-osc_phase_amp, osc_phase_amp)
-        valor = max(baseline + osc, frequencia_nominal + 0.1)
-
-    # --- segurança de limites absolutos ---
-    valor = max(min(round(valor, 2), 78.0), 28.0)
-
-    # --- controle de tempo em zona crítica ---
-    zona_critica = None
-    if valor > 70:
-        zona_critica = 'alta'
-    elif valor < 40:
-        zona_critica = 'baixa'
-
-    if zona_critica:
-        if tipo_zona != zona_critica:
-            # entrou em nova zona
-            tipo_zona = zona_critica
-            inicio_zona_critica = current_time
-        else:
-            # já estava nessa zona
-            tempo_na_zona = current_time - inicio_zona_critica
-            if tempo_na_zona > timedelta(minutes=30):
-                # força retorno gradual à faixa segura
-                if zona_critica == 'alta':
-                    valor = random.uniform(68, 70)
-                else:
-                    valor = random.uniform(40, 42)
-                tipo_zona = None
-                inicio_zona_critica = None
     else:
-        tipo_zona = None
-        inicio_zona_critica = None
+        fase = "subindo_alta"
+        alvo = frequencia_maxima
+        osc = random.uniform(-osc_phase_amp, osc_phase_amp)
 
+    # aproxima linearmente até o alvo
+    if ultima_freq < alvo:
+        ultima_freq = min(ultima_freq + velocidade_variacao, alvo)
+    elif ultima_freq > alvo:
+        ultima_freq = max(ultima_freq - velocidade_variacao, alvo)
+
+    valor = ultima_freq + osc
+
+    # --- controle de tempo fora da faixa ---
+    limite_min, limite_max = 40.0, 70.0
+    if valor < limite_min or valor > limite_max:
+        if fora_limite_desde is None:
+            fora_limite_desde = current_time
+        else:
+            tempo_fora = current_time - fora_limite_desde
+            if tempo_fora > timedelta(minutes=30):
+                # força retorno gradual à faixa segura
+                if valor < limite_min:
+                    ultima_freq += 0.2  # sobe mais rápido
+                elif valor > limite_max:
+                    ultima_freq -= 0.2
+                valor = ultima_freq
+    else:
+        fora_limite_desde = None  # reset do contador
+
+    # segurança
+    valor = max(frequencia_minima, min(valor, frequencia_maxima))
     ultima_freq = valor
-    return valor
 
+    return round(valor, 2)
 
 # Exemplo de uso:
 simular_dados(meses=1, intervalo_minutos=1)
